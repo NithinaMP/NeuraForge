@@ -1,161 +1,164 @@
 import { useState } from 'react'
-import { Copy, Download, CheckCircle, Smartphone, Monitor, FileText } from 'lucide-react'
 
-function CopyButton({ text }) {
-  const [copied, setCopied] = useState(false)
-  const handleCopy = () => {
+function CopyBtn({ text, label = 'Copy' }) {
+  const [done, setDone] = useState(false)
+  const copy = () => {
     navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setDone(true)
+    setTimeout(() => setDone(false), 2000)
   }
   return (
-    <button onClick={handleCopy} className="btn-ghost flex items-center gap-1 text-xs">
-      {copied ? <CheckCircle size={12} className="text-sentinel-green" /> : <Copy size={12} />}
-      {copied ? 'Copied!' : 'Copy'}
+    <button className="btn-ghost" onClick={copy}>
+      {done ? '✓ Copied' : label}
     </button>
   )
 }
 
-function ContentCard({ title, content, color, mobilePreview }) {
-  const [showMobile, setShowMobile] = useState(false)
-
+function Section({ accentColor, code, title, children, actions }) {
   return (
-    <div className="sentinel-card p-5">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${color}`} />
-          <h3 className="font-display text-sm text-white">{title}</h3>
-        </div>
-        <div className="flex items-center gap-2">
-          {mobilePreview && (
-            <button
-              onClick={() => setShowMobile(!showMobile)}
-              className={`btn-ghost flex items-center gap-1 text-xs ${showMobile ? 'border-sentinel-accent text-sentinel-accent' : ''}`}
-            >
-              {showMobile ? <Monitor size={12} /> : <Smartphone size={12} />}
-              {showMobile ? 'Desktop' : 'Mobile'}
-            </button>
-          )}
-          <CopyButton text={content} />
-        </div>
-      </div>
-
-      {showMobile ? (
-        <div className="bg-slate-900 rounded-2xl p-3 max-w-sm mx-auto border border-slate-700">
-          <div className="bg-sentinel-bg rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-full bg-sentinel-accent/20 flex items-center justify-center">
-                <span className="text-sentinel-accent text-xs font-bold">S</span>
-              </div>
-              <div>
-                <p className="text-white text-xs font-bold">Sentinel Brand</p>
-                <p className="text-slate-500 text-xs">@sentinel · Just now</p>
-              </div>
-            </div>
-            <pre className="text-slate-300 text-xs whitespace-pre-wrap font-body leading-relaxed">{content}</pre>
+    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      {/* Top stripe */}
+      <div style={{ height: 3, background: accentColor }} />
+      <div style={{ padding: '16px 20px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="font-m" style={{ fontSize: 10, color: accentColor, letterSpacing: '0.12em' }}>{code}</span>
+            <span className="font-d" style={{ fontSize: 14, fontWeight: 600, color: '#dde4f0' }}>{title}</span>
           </div>
+          <div style={{ display: 'flex', gap: 6 }}>{actions}</div>
         </div>
-      ) : (
-        <pre className="text-slate-300 text-sm whitespace-pre-wrap font-body leading-relaxed bg-sentinel-bg/50 rounded-lg p-4 max-h-64 overflow-y-auto">
-          {content}
-        </pre>
-      )}
+        {children}
+      </div>
     </div>
   )
 }
 
-function FactSheetView({ factSheet }) {
-  if (!factSheet) return null
+function FactChip({ label, value, color }) {
   return (
-    <div className="sentinel-card p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-2 h-2 rounded-full bg-sentinel-accent" />
-        <h3 className="font-display text-sm text-white">Archivist's Fact-Sheet</h3>
-        <span className="text-xs text-slate-500 font-display">(Ground Truth)</span>
-      </div>
-      <div className="grid grid-cols-2 gap-3 text-xs">
-        {factSheet.product_name && (
-          <div className="sentinel-card p-3">
-            <p className="text-slate-500 font-display mb-1">Product</p>
-            <p className="text-white">{factSheet.product_name}</p>
+    <div style={{
+      background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+      borderRadius: 8, padding: '10px 14px',
+    }}>
+      <div style={{ fontSize: 10, color: '#4a5a7a', marginBottom: 4, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</div>
+      <div className="font-d" style={{ fontSize: 20, fontWeight: 700, color: color || '#dde4f0' }}>{value}</div>
+    </div>
+  )
+}
+
+function MobilePreview({ posts }) {
+  const lines = posts.split('\n').filter(l => l.trim())
+  return (
+    <div className="phone-frame" style={{ marginTop: 12 }}>
+      <div style={{ fontFamily: 'Instrument Sans', fontSize: 12 }}>
+        {lines.map((line, i) => (
+          <div key={i} style={{
+            background: 'rgba(255,255,255,0.04)', borderRadius: 8,
+            padding: '10px 12px', marginBottom: 8, color: '#b0bfd8', lineHeight: 1.5
+          }}>
+            {line.replace(/^POST \d+:\s*/, '')}
           </div>
-        )}
-        {factSheet.core_features?.length > 0 && (
-          <div className="sentinel-card p-3">
-            <p className="text-slate-500 font-display mb-1">Features Found</p>
-            <p className="text-sentinel-green font-bold">{factSheet.core_features.length}</p>
-          </div>
-        )}
-        {factSheet.ambiguity_warnings?.length > 0 && (
-          <div className="sentinel-card p-3 border-sentinel-yellow/30">
-            <p className="text-sentinel-yellow font-display mb-1">⚠ Ambiguities</p>
-            <p className="text-white">{factSheet.ambiguity_warnings.length} flagged</p>
-          </div>
-        )}
-        {factSheet.target_audience?.length > 0 && (
-          <div className="sentinel-card p-3">
-            <p className="text-slate-500 font-display mb-1">Audience</p>
-            <p className="text-white">{factSheet.target_audience.slice(0, 2).join(', ')}</p>
-          </div>
-        )}
+        ))}
       </div>
     </div>
   )
 }
 
 export default function CampaignPreview({ drafts, factSheet, totalAttempts, confidence }) {
-  if (!drafts) return null
+  const [mobileView, setMobileView] = useState(false)
 
-  const handleDownload = () => {
-    const kit = `# SENTINEL ASSEMBLY — CAMPAIGN KIT\n# Generated: ${new Date().toLocaleString()}\n# Attempts: ${totalAttempts} | Confidence: ${confidence}%\n\n---\n\n## BLOG POST\n\n${drafts.blog}\n\n---\n\n## SOCIAL THREAD\n\n${drafts.social}\n\n---\n\n## EMAIL\n\n${drafts.email}`
-    const blob = new Blob([kit], { type: 'text/plain' })
+  const exportKit = () => {
+    const content = [
+      '═══════════════════════════════════════',
+      '  SENTINEL ASSEMBLY — CAMPAIGN KIT',
+      `  Generated: ${new Date().toLocaleString()}`,
+      `  Attempts: ${totalAttempts}  |  Confidence: ${confidence}%`,
+      '═══════════════════════════════════════\n',
+      '── BLOG POST ─────────────────────────\n',
+      drafts.blog,
+      '\n── SOCIAL THREAD ─────────────────────\n',
+      drafts.social,
+      '\n── EMAIL CAMPAIGN ────────────────────\n',
+      drafts.email,
+    ].join('\n')
+    const blob = new Blob([content], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'sentinel-campaign-kit.txt'
-    a.click()
+    const a = document.createElement('a'); a.href = url; a.download = 'sentinel-campaign-kit.txt'; a.click()
     URL.revokeObjectURL(url)
   }
 
   return (
-    <div className="space-y-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
       {/* Approval Banner */}
-      <div className="p-4 rounded-xl border border-sentinel-green/40 bg-green-950/20 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <CheckCircle size={20} className="text-sentinel-green" />
-          <div>
-            <p className="font-display text-sentinel-green text-sm font-bold">CAMPAIGN APPROVED</p>
-            <p className="text-slate-400 text-xs">
-              {totalAttempts} agent loop{totalAttempts > 1 ? 's' : ''} · {confidence}% confidence · Hallucination-free
-            </p>
+      <div className="approved-badge">
+        <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(0,255,136,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <span style={{ color: '#00ff88', fontSize: 18 }}>✓</span>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div className="font-d" style={{ fontWeight: 700, color: '#00ff88', fontSize: 14, letterSpacing: '0.05em' }}>
+            CAMPAIGN APPROVED — HALLUCINATION FREE
+          </div>
+          <div className="font-m" style={{ fontSize: 11, color: '#4a5a7a', marginTop: 2 }}>
+            {totalAttempts} agent loop{totalAttempts > 1 ? 's' : ''} completed · {confidence}% prosecution confidence · All claims verified against source
           </div>
         </div>
-        <button onClick={handleDownload} className="btn-ghost flex items-center gap-2 text-xs">
-          <Download size={12} />
-          Export Kit
-        </button>
+        <button className="btn-ghost" onClick={exportKit}>↓ Export Kit</button>
       </div>
 
-      <FactSheetView factSheet={factSheet} />
+      {/* Stats row */}
+      {factSheet && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+          <FactChip label="Features" value={factSheet.core_features?.length || 0} color="#0099ff" />
+          <FactChip label="Verified Facts" value={factSheet.technical_specs?.length || 0} color="#00ff88" />
+          <FactChip label="Warnings" value={factSheet.ambiguity_warnings?.length || 0} color="#ffaa00" />
+          <FactChip label="Confidence" value={`${confidence}%`} color="#00ff88" />
+        </div>
+      )}
 
-      <ContentCard
-        title="Blog Post (500 words)"
-        content={drafts.blog}
-        color="bg-sentinel-accent"
-      />
+      {/* Blog */}
+      <Section
+        accentColor="#0099ff"
+        code="OUTPUT-01"
+        title="Blog Post · 500 words"
+        actions={<CopyBtn text={drafts.blog} />}
+      >
+        <div className="content-block">{drafts.blog}</div>
+      </Section>
 
-      <ContentCard
-        title="Social Media Thread (5 posts)"
-        content={drafts.social}
-        color="bg-sentinel-yellow"
-        mobilePreview={true}
-      />
+      {/* Social */}
+      <Section
+        accentColor="#ffaa00"
+        code="OUTPUT-02"
+        title="Social Media Thread · 5 posts"
+        actions={
+          <>
+            <button
+              className="btn-ghost"
+              onClick={() => setMobileView(!mobileView)}
+              style={mobileView ? { color: '#ffaa00', borderColor: 'rgba(255,170,0,0.3)' } : {}}
+            >
+              {mobileView ? '🖥 Desktop' : '📱 Mobile'}
+            </button>
+            <CopyBtn text={drafts.social} />
+          </>
+        }
+      >
+        {mobileView
+          ? <MobilePreview posts={drafts.social} />
+          : <div className="content-block">{drafts.social}</div>
+        }
+      </Section>
 
-      <ContentCard
+      {/* Email */}
+      <Section
+        accentColor="#b066ff"
+        code="OUTPUT-03"
         title="Email Campaign"
-        content={drafts.email}
-        color="bg-purple-400"
-      />
+        actions={<CopyBtn text={drafts.email} />}
+      >
+        <div className="content-block">{drafts.email}</div>
+      </Section>
+
     </div>
   )
 }

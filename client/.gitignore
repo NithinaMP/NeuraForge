@@ -48,3 +48,7 @@ yarn-error.log*
 *.suo
 *.ntvs*
 *.njsproj
+
+# Local Uploads (Temporary processing files)
+server/uploads/*
+!server/uploads/.gitkeep
