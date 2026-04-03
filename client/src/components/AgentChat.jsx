@@ -1,39 +1,18 @@
 import { useEffect, useRef } from 'react'
-import { Brain, Zap, Shield, AlertTriangle, CheckCircle, Clock } from 'lucide-react'
 
-const AGENT_CONFIG = {
-  archivist: { icon: Brain, label: 'The Archivist', color: 'text-sentinel-accent', bg: 'bg-cyan-950/30' },
-  ghostwriter: { icon: Zap, label: 'The Ghostwriter', color: 'text-sentinel-yellow', bg: 'bg-yellow-950/30' },
-  prosecutor: { icon: Shield, label: 'The Prosecutor', color: 'text-sentinel-red', bg: 'bg-red-950/30' },
-  system: { icon: Clock, label: 'System', color: 'text-slate-400', bg: 'bg-slate-900/30' },
+const AGENTS = {
+  archivist:   { label: 'ARCHIVIST',   code: 'AGT-01', color: '#0099ff' },
+  ghostwriter: { label: 'GHOSTWRITER', code: 'AGT-02', color: '#ffaa00' },
+  prosecutor:  { label: 'PROSECUTOR',  code: 'AGT-03', color: '#ff2d55' },
+  system:      { label: 'SYSTEM',      code: 'SYS',    color: '#4a5a7a' },
 }
 
-const STATUS_STYLE = {
-  thinking: 'log-thinking',
-  approved: 'log-approved',
-  rejected: 'log-rejected',
-  warning: 'log-warning',
-  phase: 'log-phase',
-}
-
-function LogEntry({ entry, index }) {
-  const config = AGENT_CONFIG[entry.agent] || AGENT_CONFIG.system
-  const Icon = config.icon
-  const statusClass = STATUS_STYLE[entry.status] || 'log-thinking'
-
-  return (
-    <div className={`log-entry ${statusClass}`} style={{ animationDelay: `${index * 20}ms` }}>
-      <div className="flex items-start gap-2">
-        <Icon size={12} className={`${config.color} mt-0.5 flex-shrink-0`} />
-        <div>
-          <span className={`${config.color} font-bold mr-2`}>{config.label}</span>
-          <span className="text-slate-300">{entry.message}</span>
-        </div>
-        {entry.status === 'approved' && <CheckCircle size={12} className="text-sentinel-green ml-auto flex-shrink-0 mt-0.5" />}
-        {entry.status === 'rejected' && <AlertTriangle size={12} className="text-sentinel-red ml-auto flex-shrink-0 mt-0.5" />}
-      </div>
-    </div>
-  )
+const TYPE_CLASS = {
+  thinking: 't',
+  approved: 'a',
+  rejected: 'r',
+  warning:  'w',
+  phase:    'p',
 }
 
 export default function AgentChat({ logs, currentPhase, attempts }) {
@@ -43,67 +22,75 @@ export default function AgentChat({ logs, currentPhase, attempts }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [logs])
 
-  const agentStatus = {
-    archivist: currentPhase === 'archivist' ? 'active' : logs.some(l => l.agent === 'archivist' && l.status === 'approved') ? 'done' : 'idle',
-    ghostwriter: currentPhase === 'ghostwriter' ? 'active' : 'idle',
-    prosecutor: currentPhase === 'prosecutor' ? 'active' : 'idle',
-  }
-
   return (
-    <div className="h-full flex flex-col">
-      {/* Agent Status Bar */}
-      <div className="flex gap-3 mb-4 p-3 sentinel-card">
-        {Object.entries(AGENT_CONFIG).filter(([k]) => k !== 'system').map(([key, config]) => {
-          const Icon = config.icon
-          const status = agentStatus[key]
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 0 }}>
+
+      {/* Agent Status Row */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {['archivist', 'ghostwriter', 'prosecutor'].map(key => {
+          const ag = AGENTS[key]
+          const isActive = currentPhase === key
+          const isDone = !isActive && logs.some(l => l.agent === key && l.status === 'approved')
           return (
-            <div key={key} className="flex items-center gap-2 flex-1">
-              <div className={`relative w-8 h-8 rounded-lg flex items-center justify-center ${config.bg}`}>
-                <Icon size={14} className={config.color} />
-                {status === 'active' && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-sentinel-accent rounded-full animate-pulse" />
-                )}
-                {status === 'done' && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-sentinel-green rounded-full" />
-                )}
+            <div key={key} style={{
+              flex: 1,
+              background: isActive ? `${ag.color}10` : 'rgba(255,255,255,0.02)',
+              border: `1px solid ${isActive ? ag.color + '40' : 'rgba(255,255,255,0.06)'}`,
+              borderRadius: 8,
+              padding: '10px 10px',
+              transition: 'all 0.4s',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <div className={`dot ${isActive ? 'warn' : isDone ? 'green' : 'dim'}`} />
+                <span className="font-m" style={{ fontSize: 9, color: ag.color, letterSpacing: '0.1em' }}>{ag.code}</span>
               </div>
-              <div>
-                <p className={`font-display text-xs ${config.color}`}>{config.label}</p>
-                <p className="text-slate-600 text-xs">
-                  {status === 'active' ? 'Working...' : status === 'done' ? 'Done' : 'Standby'}
-                </p>
+              <div className="font-d" style={{ fontSize: 11, fontWeight: 600, color: isActive ? '#dde4f0' : '#4a5a7a' }}>{ag.label}</div>
+              <div style={{ fontSize: 10, color: isActive ? ag.color : '#2a3a5a', marginTop: 2 }}>
+                {isActive ? 'ACTIVE' : isDone ? 'COMPLETE' : 'STANDBY'}
               </div>
             </div>
           )
         })}
       </div>
 
-      {/* Attempt Counter */}
+      {/* Loop counter */}
       {attempts > 1 && (
-        <div className="mb-3 px-3 py-2 rounded-lg bg-red-950/30 border border-sentinel-red/30 font-display text-xs text-sentinel-red flex items-center gap-2">
-          <AlertTriangle size={12} />
-          Correction loop active — Attempt {attempts}/3
+        <div style={{
+          background: 'rgba(255,45,85,0.08)', border: '1px solid rgba(255,45,85,0.25)',
+          borderRadius: 6, padding: '8px 12px', marginBottom: 12,
+          display: 'flex', alignItems: 'center', gap: 8
+        }}>
+          <div className="dot red" />
+          <span className="font-m" style={{ fontSize: 11, color: '#ff6685' }}>
+            CORRECTION LOOP — ATTEMPT {attempts} / 3
+          </span>
         </div>
       )}
 
-      {/* Live Log Feed */}
-      <div className="flex-1 overflow-y-auto space-y-0 min-h-0">
-        <div className="font-display text-xs text-slate-600 mb-3 flex items-center gap-2">
-          <div className="flex-1 h-px bg-sentinel-border" />
-          LIVE AGENT FEED
-          <div className="flex-1 h-px bg-sentinel-border" />
+      {/* Log Feed */}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.05)' }} />
+          <span className="font-m" style={{ fontSize: 10, color: '#2a3a5a', letterSpacing: '0.15em' }}>LIVE FEED</span>
+          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.05)' }} />
         </div>
 
-        {logs.length === 0 && (
-          <div className="text-center text-slate-600 font-display text-xs pt-8">
-            Waiting for pipeline to start...
+        {logs.length === 0 ? (
+          <div className="font-m" style={{ textAlign: 'center', color: '#2a3a5a', fontSize: 11, paddingTop: 32 }}>
+            Awaiting activation...
           </div>
+        ) : (
+          logs.map((entry, i) => {
+            const ag = AGENTS[entry.agent] || AGENTS.system
+            const cls = TYPE_CLASS[entry.status] || 't'
+            return (
+              <div key={i} className={`log-line ${cls}`} style={{ animationDelay: `${Math.min(i * 15, 200)}ms` }}>
+                <span style={{ color: ag.color, flexShrink: 0, fontWeight: 500 }}>[{ag.code}]</span>
+                <span style={{ wordBreak: 'break-word' }}>{entry.message}</span>
+              </div>
+            )
+          })
         )}
-
-        {logs.map((entry, i) => (
-          <LogEntry key={i} entry={entry} index={i} />
-        ))}
-
         <div ref={bottomRef} />
       </div>
     </div>

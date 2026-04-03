@@ -1,28 +1,64 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import UploadArea from './components/UploadArea'
 import AgentChat from './components/AgentChat'
 import CampaignPreview from './components/CampaignPreview'
-import { Brain, Zap, Shield, RotateCcw, AlertCircle } from 'lucide-react'
 
-const PHASE_LABELS = {
-  archivist: 'Phase 1 — Fact Extraction',
-  ghostwriter: 'Phase 2 — Content Drafting',
-  prosecutor: 'Phase 3 — Quality Audit',
+const PHASES = {
+  archivist:   { label: 'PHASE 1 — FACT EXTRACTION',   pct: 25 },
+  ghostwriter: { label: 'PHASE 2 — CONTENT SYNTHESIS',  pct: 60 },
+  prosecutor:  { label: 'PHASE 3 — PROSECUTION AUDIT',  pct: 85 },
 }
 
 export default function App() {
-  const [stage, setStage] = useState('upload') // upload | running | done | error
+  const [stage, setStage] = useState('upload')   // upload | running | done | error
   const [logs, setLogs] = useState([])
-  const [currentPhase, setCurrentPhase] = useState(null)
+  const [phase, setPhase] = useState(null)
   const [attempts, setAttempts] = useState(1)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
-  const [phaseLabel, setPhaseLabel] = useState('')
-  const abortRef = useRef(null)
+  const [progress, setProgress] = useState(0)
 
-  const addLog = useCallback((entry) => {
-    setLogs(prev => [...prev, { ...entry, time: new Date().toLocaleTimeString() }])
+  const addLog = useCallback(entry => {
+    setLogs(prev => [...prev, entry])
   }, [])
+
+  const handleEvent = useCallback(event => {
+    switch (event.type) {
+      case 'pipeline_start':
+        addLog({ agent: 'system', status: 'phase', message: event.message })
+        setProgress(5)
+        break
+      case 'phase':
+        setPhase(event.phase)
+        setProgress(PHASES[event.phase]?.pct || 50)
+        addLog({ agent: 'system', status: 'phase', message: event.message })
+        break
+      case 'log':
+        addLog(event)
+        break
+      case 'factsheet':
+        addLog({ agent: 'archivist', status: 'approved', message: `Fact-Sheet locked. ${event.data?.core_features?.length || 0} features, ${event.data?.technical_specs?.length || 0} specs extracted.` })
+        break
+      case 'rejected':
+        setAttempts(event.attempt + 1)
+        addLog({ agent: 'prosecutor', status: 'rejected', message: `REJECTED — ${event.correctionNote}` })
+        break
+      case 'approved':
+        addLog({ agent: 'prosecutor', status: 'approved', message: event.message })
+        setProgress(95)
+        break
+      case 'complete':
+        setResult(event)
+        setStage('done')
+        setPhase(null)
+        setProgress(100)
+        break
+      case 'error':
+        setError(event.message)
+        setStage('error')
+        break
+    }
+  }, [addLog])
 
   const handleStart = async ({ type, file, text }) => {
     setStage('running')
@@ -30,38 +66,26 @@ export default function App() {
     setResult(null)
     setError(null)
     setAttempts(1)
+    setProgress(2)
 
-    const formData = new FormData()
-    if (type === 'file') {
-      formData.append('document', file)
-    } else {
-      formData.append('text', text)
-    }
+    const fd = new FormData()
+    if (type === 'file') fd.append('document', file)
+    else fd.append('text', text)
 
     try {
-      const response = await fetch('/api/run-pipeline', {
-        method: 'POST',
-        body: type === 'file' ? formData : (() => { const f = new FormData(); f.append('text', text); return f })(),
-      })
+      const res = await fetch('/api/run-pipeline', { method: 'POST', body: fd })
+      if (!res.ok) throw new Error(`Server error: ${res.status}. Make sure the server is running on port 3001.`)
 
-      if (!response.ok) throw new Error(`Server error: ${response.status}`)
-
-      const reader = response.body.getReader()
+      const reader = res.body.getReader()
       const decoder = new TextDecoder()
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-
         const chunk = decoder.decode(value)
-        const lines = chunk.split('\n')
-
-        for (const line of lines) {
+        for (const line of chunk.split('\n')) {
           if (!line.startsWith('data: ')) continue
-          try {
-            const event = JSON.parse(line.slice(6))
-            handleEvent(event)
-          } catch {}
+          try { handleEvent(JSON.parse(line.slice(6))) } catch {}
         }
       }
     } catch (err) {
@@ -70,159 +94,164 @@ export default function App() {
     }
   }
 
-  const handleEvent = (event) => {
-    switch (event.type) {
-      case 'pipeline_start':
-        addLog({ agent: 'system', status: 'thinking', message: event.message })
-        break
-
-      case 'phase':
-        setCurrentPhase(event.phase)
-        setPhaseLabel(PHASE_LABELS[event.phase] || '')
-        addLog({ agent: 'system', status: 'phase', message: event.message })
-        break
-
-      case 'log':
-        addLog(event)
-        break
-
-      case 'factsheet':
-        addLog({ agent: 'archivist', status: 'approved', message: `Fact-Sheet locked. ${event.data?.core_features?.length || 0} facts verified.` })
-        break
-
-      case 'rejected':
-        setAttempts(event.attempt + 1)
-        addLog({ agent: 'prosecutor', status: 'rejected', message: `REJECTED — ${event.correctionNote}` })
-        break
-
-      case 'approved':
-        addLog({ agent: 'prosecutor', status: 'approved', message: event.message })
-        break
-
-      case 'complete':
-        setResult(event)
-        setStage('done')
-        setCurrentPhase(null)
-        break
-
-      case 'error':
-        setError(event.message)
-        setStage('error')
-        break
-    }
+  const reset = () => {
+    setStage('upload'); setLogs([]); setResult(null)
+    setError(null); setPhase(null); setAttempts(1); setProgress(0)
   }
 
-  const handleReset = () => {
-    setStage('upload')
-    setLogs([])
-    setResult(null)
-    setError(null)
-    setCurrentPhase(null)
-    setAttempts(1)
-  }
+  // ── Upload screen ──────────────────────
+  if (stage === 'upload') return <UploadArea onStart={handleStart} />
 
-  if (stage === 'upload') {
-    return <UploadArea onStart={handleStart} isRunning={false} />
-  }
+  // ── Running / Done / Error ─────────────
+  const phaseInfo = phase ? PHASES[phase] : null
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+
       {/* Top Bar */}
-      <header className="border-b border-sentinel-border px-6 py-4 flex items-center justify-between bg-sentinel-panel/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="flex items-center gap-4">
-          <h1 className="font-display text-white font-bold text-lg">
-            Sentinel <span className="text-sentinel-accent">Assembly</span>
-          </h1>
-          <div className="h-4 w-px bg-sentinel-border" />
-          {currentPhase && (
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-sentinel-accent animate-pulse" />
-              <span className="font-display text-sentinel-accent text-xs">{phaseLabel}</span>
+      <div className="topbar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <span className="font-d" style={{ fontWeight: 800, fontSize: 16, letterSpacing: '0.05em' }}>
+            SENTINEL <span style={{ color: '#00ff88' }}>ASSEMBLY</span>
+          </span>
+          <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.08)' }} />
+          {phase && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="dot warn" />
+              <span className="font-m" style={{ fontSize: 11, color: '#ffaa00', letterSpacing: '0.1em' }}>
+                {phaseInfo?.label}
+              </span>
             </div>
           )}
           {stage === 'done' && (
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-sentinel-green" />
-              <span className="font-display text-sentinel-green text-xs">PIPELINE COMPLETE</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="dot green" />
+              <span className="font-m" style={{ fontSize: 11, color: '#00ff88', letterSpacing: '0.1em' }}>MISSION COMPLETE</span>
             </div>
           )}
-        </div>
-        <div className="flex items-center gap-3">
-          {attempts > 1 && (
-            <span className="font-display text-xs text-sentinel-red border border-sentinel-red/30 px-3 py-1 rounded-full">
-              Loop #{attempts}
-            </span>
-          )}
-          <button onClick={handleReset} className="btn-ghost flex items-center gap-2 text-xs">
-            <RotateCcw size={12} />
-            New Campaign
-          </button>
-        </div>
-      </header>
-
-      {/* Main Layout */}
-      <div className="flex-1 flex overflow-hidden" style={{ height: 'calc(100vh - 65px)' }}>
-
-        {/* Left: Agent Room */}
-        <div className="w-96 flex-shrink-0 border-r border-sentinel-border p-5 overflow-y-auto bg-sentinel-panel/40">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="font-display text-xs text-slate-500 uppercase tracking-widest">Agent Room</span>
-            {stage === 'running' && <div className="w-1.5 h-1.5 rounded-full bg-sentinel-accent animate-pulse" />}
-          </div>
-          <AgentChat logs={logs} currentPhase={currentPhase} attempts={attempts} />
-        </div>
-
-        {/* Right: Campaign Preview */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {stage === 'running' && !result && (
-            <div className="flex flex-col items-center justify-center h-full gap-6 text-center">
-              {/* Animated agent icons */}
-              <div className="relative">
-                <div className="flex gap-6">
-                  {[
-                    { icon: Brain, color: 'text-sentinel-accent', active: currentPhase === 'archivist' },
-                    { icon: Zap, color: 'text-sentinel-yellow', active: currentPhase === 'ghostwriter' },
-                    { icon: Shield, color: 'text-sentinel-red', active: currentPhase === 'prosecutor' },
-                  ].map(({ icon: Icon, color, active }, i) => (
-                    <div
-                      key={i}
-                      className={`w-16 h-16 rounded-2xl sentinel-card flex items-center justify-center transition-all duration-500 ${
-                        active ? `${color} scale-110 animate-glow` : 'text-slate-600 scale-100'
-                      }`}
-                    >
-                      <Icon size={28} />
-                    </div>
-                  ))}
-                </div>
-                {/* Connecting lines */}
-                <div className="absolute top-1/2 left-16 right-16 h-px bg-gradient-to-r from-sentinel-accent/40 via-sentinel-yellow/40 to-sentinel-red/40 -translate-y-1/2 -z-10" />
-              </div>
-              <div>
-                <p className="font-display text-white text-lg mb-2">{phaseLabel || 'Initializing...'}</p>
-                <p className="text-slate-500 text-sm font-body">Agents are collaborating in real-time</p>
-                <p className="text-slate-600 text-xs font-display mt-2">Watch the Agent Room for live updates →</p>
-              </div>
-            </div>
-          )}
-
           {stage === 'error' && (
-            <div className="flex flex-col items-center justify-center h-full gap-4">
-              <AlertCircle size={48} className="text-sentinel-red" />
-              <div className="text-center">
-                <p className="font-display text-sentinel-red text-lg mb-2">Pipeline Error</p>
-                <p className="text-slate-400 text-sm max-w-md">{error}</p>
-                <p className="text-slate-600 text-xs mt-2 font-display">Make sure your GEMINI_API_KEY is set in /server/.env</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="dot red" />
+              <span className="font-m" style={{ fontSize: 11, color: '#ff2d55', letterSpacing: '0.1em' }}>PIPELINE FAILURE</span>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {attempts > 1 && (
+            <span className="chip chip-red">Loop #{attempts}</span>
+          )}
+          <span className="chip chip-dim font-m" style={{ fontSize: 10 }}>
+            {logs.length} events
+          </span>
+          <button className="btn-ghost" onClick={reset}>↺ New Mission</button>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="progress-bar" style={{ borderRadius: 0 }}>
+        <div className="progress-fill" style={{ width: `${progress}%` }} />
+      </div>
+
+      {/* Main layout */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+
+        {/* Left — Agent Room */}
+        <div style={{
+          width: 340, flexShrink: 0,
+          borderRight: '1px solid rgba(255,255,255,0.06)',
+          background: 'rgba(7,13,26,0.6)',
+          padding: '20px 16px',
+          overflow: 'hidden',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          <div className="font-m" style={{ fontSize: 10, color: '#2a3a5a', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 16 }}>
+            ◈ Agent Operations Room
+          </div>
+          <AgentChat logs={logs} currentPhase={phase} attempts={attempts} />
+        </div>
+
+        {/* Right — Output */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+
+          {/* Running state (no result yet) */}
+          {stage === 'running' && !result && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 32 }}>
+              {/* Animated orbs */}
+              <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+                {[
+                  { color: '#0099ff', active: phase === 'archivist' },
+                  { color: '#ffaa00', active: phase === 'ghostwriter' },
+                  { color: '#ff2d55', active: phase === 'prosecutor' },
+                ].map((orb, i) => (
+                  <div key={i} style={{ position: 'relative' }}>
+                    <div style={{
+                      width: 64, height: 64, borderRadius: '50%',
+                      background: orb.active ? `${orb.color}15` : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${orb.active ? orb.color + '60' : 'rgba(255,255,255,0.07)'}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all 0.5s',
+                      transform: orb.active ? 'scale(1.1)' : 'scale(1)',
+                    }}>
+                      <div style={{
+                        width: 20, height: 20, borderRadius: '50%',
+                        background: orb.active ? orb.color : 'rgba(255,255,255,0.1)',
+                        boxShadow: orb.active ? `0 0 16px ${orb.color}` : 'none',
+                        transition: 'all 0.5s',
+                        animation: orb.active ? 'pulse 1s ease-in-out infinite' : 'none',
+                      }} />
+                    </div>
+                    {orb.active && (
+                      <div style={{
+                        position: 'absolute', inset: -6, borderRadius: '50%',
+                        border: `1px solid ${orb.color}40`,
+                        animation: 'ringOut 1.5s ease-out infinite',
+                      }} />
+                    )}
+                    {i < 2 && (
+                      <div style={{ position: 'absolute', top: '50%', left: '100%', width: 24, height: 1, background: 'rgba(255,255,255,0.07)', transform: 'translateY(-50%)' }} />
+                    )}
+                  </div>
+                ))}
               </div>
-              <button onClick={handleReset} className="btn-primary mt-4">Try Again</button>
+
+              <div style={{ textAlign: 'center' }}>
+                <div className="font-d" style={{ fontSize: 18, fontWeight: 700, color: '#dde4f0', marginBottom: 8 }}>
+                  {phaseInfo?.label || 'Initializing...'}
+                </div>
+                <div style={{ fontSize: 13, color: '#4a5a7a' }}>
+                  Agents are collaborating in real-time
+                </div>
+                <div className="font-m" style={{ fontSize: 11, color: '#2a3a5a', marginTop: 8 }}>
+                  ← Watch the Agent Room for live updates
+                </div>
+              </div>
             </div>
           )}
 
+          {/* Error state */}
+          {stage === 'error' && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 20, textAlign: 'center' }}>
+              <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(255,45,85,0.1)', border: '1px solid rgba(255,45,85,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>⚠</div>
+              <div>
+                <div className="font-d" style={{ color: '#ff2d55', fontSize: 18, fontWeight: 700, marginBottom: 10 }}>PIPELINE FAILURE</div>
+                <div style={{ color: '#5a6a8a', fontSize: 14, maxWidth: 440, lineHeight: 1.6 }}>{error}</div>
+                <div className="font-m" style={{ color: '#2a3a5a', fontSize: 11, marginTop: 12 }}>
+                  → Verify GEMINI_API_KEY is set in server/.env<br />
+                  → Confirm server is running: node index.js in /server
+                </div>
+              </div>
+              <button className="btn-primary" style={{ width: 'auto', padding: '12px 32px' }} onClick={reset}>Retry Mission</button>
+            </div>
+          )}
+
+          {/* Done state */}
           {result && (
             <CampaignPreview
               drafts={result.drafts}
               factSheet={result.factSheet}
               totalAttempts={result.totalAttempts}
-              confidence={result.confidence || 95}
+              confidence={result.confidence || 97}
             />
           )}
         </div>
