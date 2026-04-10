@@ -1,3 +1,165 @@
+import { useState } from 'react'
+
+export default function AuthPage({ onAuth }) {
+  const [mode, setMode]       = useState('login')
+  const [name, setName]       = useState('')
+  const [email, setEmail]     = useState('')
+  const [password, setPass]   = useState('')
+  const [error, setError]     = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const validate = () => {
+    if (mode === 'register' && !name.trim()) return 'Full name is required.'
+    if (!email.includes('@')) return 'Enter a valid email address.'
+    if (password.length < 6) return 'Password must be at least 6 characters.'
+    return null
+  }
+
+  const submit = async () => {
+    const err = validate()
+    if (err) { setError(err); return }
+    setError('')
+    setLoading(true)
+    try {
+      const res = await fetch(mode === 'login' ? '/api/auth/login' : '/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          mode === 'login'
+            ? { email: email.trim().toLowerCase(), password }
+            : { name: name.trim(), email: email.trim().toLowerCase(), password }
+        ),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Something went wrong.')
+      localStorage.setItem('s_token', data.token)
+      localStorage.setItem('s_user', JSON.stringify(data.user))
+      onAuth(data.user, data.token)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadDemo = () => {
+    setEmail('demo@sentinel.ai')
+    setPass('demo123')
+    setName('Demo Agent')
+    setError('')
+  }
+
+  return (
+    <div className="full-page">
+      {/* Corner brackets */}
+      <div style={{ position: 'fixed', top: 22, left: 22, width: 30, height: 30, borderTop: '1px solid rgba(0,255,136,0.2)', borderLeft: '1px solid rgba(0,255,136,0.2)' }} />
+      <div style={{ position: 'fixed', top: 22, right: 22, width: 30, height: 30, borderTop: '1px solid rgba(0,255,136,0.2)', borderRight: '1px solid rgba(0,255,136,0.2)' }} />
+      <div style={{ position: 'fixed', bottom: 22, left: 22, width: 30, height: 30, borderBottom: '1px solid rgba(0,255,136,0.2)', borderLeft: '1px solid rgba(0,255,136,0.2)' }} />
+      <div style={{ position: 'fixed', bottom: 22, right: 22, width: 30, height: 30, borderBottom: '1px solid rgba(0,255,136,0.2)', borderRight: '1px solid rgba(0,255,136,0.2)' }} />
+
+      {/* Brand */}
+      <div className="anim-up" style={{ textAlign: 'center', marginBottom: 44 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, marginBottom: 18 }}>
+          <div className="dot dot-green" />
+          <span className="font-m" style={{ fontSize: 10, color: 'var(--green)', letterSpacing: '0.22em' }}>
+            SENTINEL ASSEMBLY · v2.0
+          </span>
+          <div className="dot dot-green" />
+        </div>
+        <h1 className="font-d" style={{ fontSize: 'clamp(44px,9vw,72px)', fontWeight: 800, lineHeight: 0.92, letterSpacing: '-0.025em', color: '#fff' }}>
+          SENTINEL
+        </h1>
+        <h1 className="font-d" style={{ fontSize: 'clamp(44px,9vw,72px)', fontWeight: 800, lineHeight: 0.92, letterSpacing: '-0.025em', color: 'var(--green)', marginBottom: 20 }}>
+          ASSEMBLY
+        </h1>
+        <p style={{ color: 'var(--text-2)', fontSize: 14, fontWeight: 300, lineHeight: 1.6 }}>
+          Self-governing AI content governance engine.<br />
+          Three agents. One truth.
+        </p>
+      </div>
+
+      {/* Auth Card */}
+      <div className="card anim-up-1" style={{ width: '100%', maxWidth: 400, padding: 28 }}>
+        {/* Mode toggle */}
+        <div className="tabs" style={{ marginBottom: 24 }}>
+          <button className={`tab-item ${mode === 'login' ? 'active' : ''}`}
+            onClick={() => { setMode('login'); setError('') }}>
+            Sign In
+          </button>
+          <button className={`tab-item ${mode === 'register' ? 'active' : ''}`}
+            onClick={() => { setMode('register'); setError('') }}>
+            Create Account
+          </button>
+        </div>
+
+        {/* Fields */}
+        {mode === 'register' && (
+          <div style={{ marginBottom: 14 }}>
+            <label className="label">Full Name</label>
+            <input className="input" placeholder="Your full name" value={name}
+              onChange={e => setName(e.target.value)} autoComplete="name" />
+          </div>
+        )}
+
+        <div style={{ marginBottom: 14 }}>
+          <label className="label">Email Address</label>
+          <input className="input" type="email" placeholder="you@company.com" value={email}
+            onChange={e => setEmail(e.target.value)} autoComplete="email" />
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label className="label">Password</label>
+          <input className="input" type="password"
+            placeholder={mode === 'register' ? 'Min. 6 characters' : '••••••••'}
+            value={password} onChange={e => setPass(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && submit()} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
+        </div>
+
+        {error && (
+          <div className="form-error" style={{ marginBottom: 14 }}>
+            <span>⚠</span> {error}
+          </div>
+        )}
+
+        <button className="btn-primary" onClick={submit} disabled={loading}>
+          {loading
+            ? <><div className="spinner" style={{ color: '#02040a' }} /> Processing...</>
+            : mode === 'login' ? '→ Access Sentinel' : '→ Create Account'
+          }
+        </button>
+
+        <div className="divider">
+          <span className="divider-text">OR</span>
+        </div>
+
+        <button className="btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={loadDemo}>
+          Load demo credentials
+        </button>
+      </div>
+
+      {/* Footer badges */}
+      <div className="anim-up-2" style={{ display: 'flex', gap: 8, marginTop: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
+        {['3-Agent Pipeline', 'JWT Secured', 'Mission History', 'Free AI Tier'].map(t => (
+          <span key={t} className="chip chip-dim">{t}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // import { useState } from 'react'
 
 // export default function AuthPage({ onAuth }) {
@@ -167,201 +329,203 @@
 
 
 
-import { useState } from 'react'
+// // import { useState } from 'react'
 
-export default function AuthPage({ onAuth }) {
-  const [mode, setMode]       = useState('login')
-  const [name, setName]       = useState('')
-  const [email, setEmail]     = useState('')
-  const [password, setPass]   = useState('')
-  const [error, setError]     = useState('')
-  const [loading, setLoading] = useState(false)
+// // export default function AuthPage({ onAuth }) {
+// //   const [mode, setMode]       = useState('login')
+// //   const [name, setName]       = useState('')
+// //   const [email, setEmail]     = useState('')
+// //   const [password, setPass]   = useState('')
+// //   const [error, setError]     = useState('')
+// //   const [loading, setLoading] = useState(false)
 
-  // ── Validation Logic ────────────────────────────────
-  const validate = () => {
-    // Mode-specific checks
-    if (mode === 'register') {
-      if (!name || name.trim().length < 2) return 'Full name is required.'
-    }
+// //   // ── Validation Logic ────────────────────────────────
+// //   const validate = () => {
+// //     // Mode-specific checks
+// //     if (mode === 'register') {
+// //       if (!name || name.trim().length < 2) return 'Full name is required.'
+// //     }
     
-    // Global checks
-    if (!email || !email.includes('@')) return 'Enter a valid email address.'
-    if (!password || password.length < 6) return 'Password must be at least 6 characters.'
+// //     // Global checks
+// //     if (!email || !email.includes('@')) return 'Enter a valid email address.'
+// //     if (!password || password.length < 6) return 'Password must be at least 6 characters.'
     
-    return null
-  }
+// //     return null
+// //   }
 
-  // ── Submit Handshake ────────────────────────────────
-  const submit = async () => {
-    const validationError = validate()
-    if (validationError) {
-      setError(validationError)
-      return
-    }
+// //   // ── Submit Handshake ────────────────────────────────
+// //   const submit = async () => {
+// //     const validationError = validate()
+// //     if (validationError) {
+// //       setError(validationError)
+// //       return
+// //     }
 
-    setError('')
-    setLoading(true)
+// //     setError('')
+// //     setLoading(true)
 
-    try {
-      const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register'
+// //     try {
+// //       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register'
       
-      // We use relative paths. Vite Proxy will handle the localhost:3001 bridge.
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          mode === 'login'
-            ? { 
-                email: email.trim().toLowerCase(), 
-                password: password 
-              }
-            : { 
-                name: name.trim(), 
-                email: email.trim().toLowerCase(), 
-                password: password 
-              }
-        ),
-      })
+// //       // We use relative paths. Vite Proxy will handle the localhost:3001 bridge.
+// //       const res = await fetch(endpoint, {
+// //         method: 'POST',
+// //         headers: { 'Content-Type': 'application/json' },
+// //         body: JSON.stringify(
+// //           mode === 'login'
+// //             ? { 
+// //                 email: email.trim().toLowerCase(), 
+// //                 password: password 
+// //               }
+// //             : { 
+// //                 name: name.trim(), 
+// //                 email: email.trim().toLowerCase(), 
+// //                 password: password 
+// //               }
+// //         ),
+// //       })
 
-      const data = await res.json()
+// //       const data = await res.json()
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Identity verification failed.')
-      }
+// //       if (!res.ok) {
+// //         throw new Error(data.error || 'Identity verification failed.')
+// //       }
 
-      // Vault Storage
-      localStorage.setItem('s_token', data.token)
-      localStorage.setItem('s_user', JSON.stringify(data.user))
+// //       // Vault Storage
+// //       localStorage.setItem('s_token', data.token)
+// //       localStorage.setItem('s_user', JSON.stringify(data.user))
       
-      // Grant Access
-      onAuth(data.user, data.token)
+// //       // Grant Access
+// //       onAuth(data.user, data.token)
 
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-    }
-  }
+// //     } catch (e) {
+// //       setError(e.message)
+// //     } finally {
+// //       setLoading(false)
+// //     }
+// //   }
 
-  // ── Demo Credential Injector ────────────────────────
-  const loadDemo = () => {
-    setMode('login') // Switch to login for demo
-    setEmail('demo@sentinel.ai')
-    setPass('demo123')
-    setName('Demo Agent')
-    setError('')
-  }
+// //   // ── Demo Credential Injector ────────────────────────
+// //   const loadDemo = () => {
+// //     setMode('login') // Switch to login for demo
+// //     setEmail('demo@sentinel.ai')
+// //     setPass('demo123')
+// //     setName('Demo Agent')
+// //     setError('')
+// //   }
+  
 
-  return (
-    <div className="full-page">
-      {/* Corner Brackets */}
-      <div className="bracket-tl" />
-      <div className="bracket-tr" />
-      <div className="bracket-bl" />
-      <div className="bracket-br" />
 
-      {/* Brand Header */}
-      <div className="anim-up" style={{ textAlign: 'center', marginBottom: 44 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, marginBottom: 18 }}>
-          <div className="dot dot-green" />
-          <span className="font-m" style={{ fontSize: 10, color: 'var(--green)', letterSpacing: '0.22em' }}>
-            SENTINEL ASSEMBLY · v2.0
-          </span>
-          <div className="dot dot-green" />
-        </div>
-        <h1 className="font-d brand-title">SENTINEL</h1>
-        <h1 className="font-d brand-title green">ASSEMBLY</h1>
-        <p className="brand-sub">
-          Self-governing AI content governance engine.<br />
-          Three agents. One truth.
-        </p>
-      </div>
+// //   // return (
+// //   //   <div className="full-page">
+// //   //     {/* Corner Brackets */}
+// //   //     <div className="bracket-tl" />
+// //   //     <div className="bracket-tr" />
+// //   //     <div className="bracket-bl" />
+// //   //     <div className="bracket-br" />
 
-      {/* Auth Card */}
-      <div className="card anim-up-1 auth-card">
-        {/* Mode toggle */}
-        <div className="tabs" style={{ marginBottom: 24 }}>
-          <button 
-            className={`tab-item ${mode === 'login' ? 'active' : ''}`}
-            onClick={() => { setMode('login'); setError('') }}>
-            Sign In
-          </button>
-          <button 
-            className={`tab-item ${mode === 'register' ? 'active' : ''}`}
-            onClick={() => { setMode('register'); setError('') }}>
-            Create Account
-          </button>
-        </div>
+// //   //     {/* Brand Header */}
+// //   //     <div className="anim-up" style={{ textAlign: 'center', marginBottom: 44 }}>
+// //   //       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, marginBottom: 18 }}>
+// //   //         <div className="dot dot-green" />
+// //   //         <span className="font-m" style={{ fontSize: 10, color: 'var(--green)', letterSpacing: '0.22em' }}>
+// //   //           SENTINEL ASSEMBLY · v2.0
+// //   //         </span>
+// //   //         <div className="dot dot-green" />
+// //   //       </div>
+// //   //       <h1 className="font-d brand-title">SENTINEL</h1>
+// //   //       <h1 className="font-d brand-title green">ASSEMBLY</h1>
+// //   //       <p className="brand-sub">
+// //   //         Self-governing AI content governance engine.<br />
+// //   //         Three agents. One truth.
+// //   //       </p>
+// //   //     </div>
 
-        {/* Dynamic Fields */}
-        <div className="form-container">
-          {mode === 'register' && (
-            <div className="field-group">
-              <label className="label">Full Name</label>
-              <input 
-                className="input" 
-                placeholder="Ex: Adithya Ganesh" 
-                value={name}
-                onChange={e => setName(e.target.value)} 
-                autoComplete="name" 
-              />
-            </div>
-          )}
+// //   //     {/* Auth Card */}
+// //   //     <div className="card anim-up-1 auth-card">
+// //   //       {/* Mode toggle */}
+// //   //       <div className="tabs" style={{ marginBottom: 24 }}>
+// //   //         <button 
+// //   //           className={`tab-item ${mode === 'login' ? 'active' : ''}`}
+// //   //           onClick={() => { setMode('login'); setError('') }}>
+// //   //           Sign In
+// //   //         </button>
+// //   //         <button 
+// //   //           className={`tab-item ${mode === 'register' ? 'active' : ''}`}
+// //   //           onClick={() => { setMode('register'); setError('') }}>
+// //   //           Create Account
+// //   //         </button>
+// //   //       </div>
 
-          <div className="field-group">
-            <label className="label">Email Address</label>
-            <input 
-              className="input" 
-              type="email" 
-              placeholder="agent@sentinel.ai" 
-              value={email}
-              onChange={e => setEmail(e.target.value)} 
-              autoComplete="email" 
-            />
-          </div>
+// //   //       {/* Dynamic Fields */}
+// //   //       <div className="form-container">
+// //   //         {mode === 'register' && (
+// //   //           <div className="field-group">
+// //   //             <label className="label">Full Name</label>
+// //   //             <input 
+// //   //               className="input" 
+// //   //               placeholder="Ex: Adithya Ganesh" 
+// //   //               value={name}
+// //   //               onChange={e => setName(e.target.value)} 
+// //   //               autoComplete="name" 
+// //   //             />
+// //   //           </div>
+// //   //         )}
 
-          <div className="field-group">
-            <label className="label">Password</label>
-            <input 
-              className="input" 
-              type="password"
-              placeholder={mode === 'register' ? 'Min. 6 characters' : '••••••••'}
-              value={password} 
-              onChange={e => setPass(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && submit()} 
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'} 
-            />
-          </div>
-        </div>
+// //   //         <div className="field-group">
+// //   //           <label className="label">Email Address</label>
+// //   //           <input 
+// //   //             className="input" 
+// //   //             type="email" 
+// //   //             placeholder="agent@sentinel.ai" 
+// //   //             value={email}
+// //   //             onChange={e => setEmail(e.target.value)} 
+// //   //             autoComplete="email" 
+// //   //           />
+// //   //         </div>
 
-        {error && (
-          <div className="form-error">
-            <span>⚠</span> {error}
-          </div>
-        )}
+// //   //         <div className="field-group">
+// //   //           <label className="label">Password</label>
+// //   //           <input 
+// //   //             className="input" 
+// //   //             type="password"
+// //   //             placeholder={mode === 'register' ? 'Min. 6 characters' : '••••••••'}
+// //   //             value={password} 
+// //   //             onChange={e => setPass(e.target.value)}
+// //   //             onKeyDown={e => e.key === 'Enter' && submit()} 
+// //   //             autoComplete={mode === 'login' ? 'current-password' : 'new-password'} 
+// //   //           />
+// //   //         </div>
+// //   //       </div>
 
-        <button className="btn-primary" onClick={submit} disabled={loading}>
-          {loading
-            ? <><div className="spinner" /> Processing...</>
-            : mode === 'login' ? '→ Access Sentinel' : '→ Create Account'
-          }
-        </button>
+// //   //       {error && (
+// //   //         <div className="form-error">
+// //   //           <span>⚠</span> {error}
+// //   //         </div>
+// //   //       )}
 
-        <div className="divider">
-          <span className="divider-text">OR</span>
-        </div>
+// //   //       <button className="btn-primary" onClick={submit} disabled={loading}>
+// //   //         {loading
+// //   //           ? <><div className="spinner" /> Processing...</>
+// //   //           : mode === 'login' ? '→ Access Sentinel' : '→ Create Account'
+// //   //         }
+// //   //       </button>
 
-        <button className="btn-ghost demo-btn" onClick={loadDemo}>
-          Load demo credentials
-        </button>
-      </div>
+// //   //       <div className="divider">
+// //   //         <span className="divider-text">OR</span>
+// //   //       </div>
 
-      {/* Global Metadata */}
-      <div className="anim-up-2 chip-container">
-        {['3-Agent Pipeline', 'JWT Secured', 'MySQL Vault', 'Vite/ESM'].map(t => (
-          <span key={t} className="chip chip-dim">{t}</span>
-        ))}
-      </div>
-    </div>
-  )
-}
+// //   //       <button className="btn-ghost demo-btn" onClick={loadDemo}>
+// //   //         Load demo credentials
+// //   //       </button>
+// //   //     </div>
+
+// //   //     {/* Global Metadata */}
+// //   //     <div className="anim-up-2 chip-container">
+// //   //       {['3-Agent Pipeline', 'JWT Secured', 'MySQL Vault', 'Vite/ESM'].map(t => (
+// //   //         <span key={t} className="chip chip-dim">{t}</span>
+// //   //       ))}
+// //   //     </div>
+// //   //   </div>
+// //   // )
+// // }
