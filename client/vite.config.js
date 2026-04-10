@@ -1,17 +1,3 @@
-// // import { defineConfig } from 'vite'
-// // import react from '@vitejs/plugin-react'
-
-// // export default defineConfig({
-// //   plugins: [react()],
-// //   server: {
-// //     proxy: {
-// //       '/api': {
-// //         target: 'http://localhost:3001',
-// //         changeOrigin: true,
-// //       }
-// //     }
-// //   }
-// // })
 // import { defineConfig } from 'vite'
 // import react from '@vitejs/plugin-react'
 
@@ -20,18 +6,24 @@
 //   server: {
 //     proxy: {
 //       '/api': {
-//         target: 'https://sentinel-factory.onrender.com',
+//         target: 'http://localhost:3001',
 //         changeOrigin: true,
-//         secure: false,
 //       }
 //     }
 //   }
 // })
-
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: "/"  // <--- CHANGE THIS from "./" to "/"
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://sentinel-factory.onrender.com',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
+  }
 })
