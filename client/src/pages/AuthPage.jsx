@@ -181,11 +181,41 @@ export default function AuthPage({ onAuth }) {
         </button>
       </div>
 
-      <div className="anim-up-2" style={{ display: 'flex', gap: 8, marginTop: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
+      {/* <div className="anim-up-2" style={{ display: 'flex', gap: 8, marginTop: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
         {['3-Agent Pipeline', 'JWT Secured', 'Mission History', 'Free AI Tier'].map(t => (
           <span key={t} className="chip chip-dim">{t}</span>
         ))}
-      </div>
+      </div> */}
+
+      {/* Creative Footer Badges */}
+<div className="anim-up-2" style={{ 
+  display: 'flex', 
+  gap: 10, 
+  marginTop: 40, 
+  flexWrap: 'wrap', 
+  justifyContent: 'center' 
+}}>
+  {[
+    "Three Minds, One Truth",
+    "Vault-Locked Security",
+    "Living Archive",
+    "Unlimited Free Runs"
+  ].map((text, i) => (
+    <span 
+      key={i} 
+      className="chip chip-dim" 
+      style={{ 
+        fontSize: 11.5, 
+        padding: '8px 16px',
+        letterSpacing: '0.04em',
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.08)'
+      }}
+    >
+      {text}
+    </span>
+  ))}
+</div>
     </div>
   );
 }
