@@ -1,4 +1,4 @@
-# 🏛️ Sentinel Assembly v2.0
+# 🏛️ Sentinel Assembly 
 
 ### *Self-Correcting Multi-Agent Content Governance Engine*
 
