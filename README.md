@@ -215,8 +215,7 @@ sentinel-assembly/
 
 ## Approach Document
 
-See [`APPROACH.md`](./APPROACH.md) for the full solution design, tech stack reasoning, and improvement roadmap.
+See [APPROACH.md](docs/APPROACH.md) for the full solution design, tech stack reasoning, and improvement roadmap.
 
 ---
 
-*Built for the 2-Week AI Sprint · April 2026*
